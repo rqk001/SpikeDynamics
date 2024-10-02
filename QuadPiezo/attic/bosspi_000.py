@@ -34,28 +34,31 @@ def iwrreg(a, out):
     cs.on()
     return struct.unpack('>h', bin)
 
-def a4wave(ba4):
+def tonewave(snd, size):
     import math
-    for i in range(0, 18):
-        ba4[i*2:i*2+2]=struct.pack('>h',int(2000 * math.sin(math.pi * i / 9)) & 0x0fff)
+    for i in range(0, size//2):
+        snd[i*2:i*2+2]=struct.pack('>h',int(2000 * math.sin(math.pi * i / (size//4))) & 0x0fff)
 
-def a4play(h, ba4):
-    i=0
-    flag = 0x10
-    bufsize = 36
+def sndsend(h, cs, size, snd, ind, bout, bin):
+    cs.off()
+    h.write_readinto(bout, bin)
+    while (( bin[0] & 0xf0 ) != 0xc0 or (bin[1] & 0xc0) == 0x80):
+        h.write_readinto(bout, bin)
+    len = (bin[1] & 0x7f) * 2
+    trim = len if (len + ind) <= size else size - ind
+    h.write(snd[ind:ind+trim])
+    cs.on()
+    ind += trim
+    if (ind >= size):
+        ind -= size
+    return ind
+
+def sndplay(h, cs, snd, bufsize):
     ind = 0
-    b5617=struct.pack('>h', 0x5617)
+    b5616=struct.pack('>h', 0x5616)
     bin=bytearray(2)
     while(True):
-        h.write_readinto(b5617, bin)
-        while (( bin[0] & 0xf0 ) != 0xc0 or (bin[1] & 0xc0) == 0x80):
-            h.write_readinto(b5617, bin)
-        len = (bin[1] & 0x7f) * 2
-        trim = len if (len + ind) <= bufsize else bufsize - ind
-        h.write(ba4[ind:ind+trim])
-        ind += trim
-        if (ind >= bufsize):
-            ind -= bufsize
+        ind = sndsend(h, cs, bufsize, snd, ind, b5616, bin)
 
 def a4playd(h, a4):
     i=0
